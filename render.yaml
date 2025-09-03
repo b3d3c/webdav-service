@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: webdav-server
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18.x
+      - key: WEBDAV_USERNAME
+        fromSecret: WEBDAV_USERNAME
+      - key: WEBDAV_PASSWORD
+        fromSecret: WEBDAV_PASSWORD
