@@ -1,8 +1,8 @@
 const { v2 } = require('webdav-server');
 const express = require('express');
 const basicAuth = require('basic-auth');
+const fs = require('fs');
 const path = require('path');
-require('dotenv').config();
 
 const app = express();
 
@@ -19,47 +19,57 @@ const auth = (req, res, next) => {
     next();
 };
 
-// Configuración del servidor WebDAV
+// Configuración del servidor WebDAV con soporte CalDAV
 const server = new v2.WebDAVServer({
     port: process.env.PORT || 3000,
     autoSave: {
         onServerStart: true,
-        treeFilePath: './tree.json'
+        treeFilePath: '/data/tree.json'
     },
     autoLoad: {
-        treeFilePath: './tree.json'
-    }
+        treeFilePath: '/data/tree.json'
+    },
+    // Habilitar soporte para CalDAV
+    enableCalDAV: true
 });
 
-// Ruta principal para WebDAV
+// Crear estructura inicial para calendarios
+server.afterRequest((ctx, next) => {
+    const rootPath = '/';
+    server.getFileSystem(rootPath, (e, rootFS) => {
+        if (!e) {
+            // Crear carpeta de calendarios si no existe
+            rootFS.create('/calendars', true, () => {});
+        }
+    });
+    next();
+});
+
+// Ruta principal para WebDAV/CalDAV
 app.use('/webdav', auth, (req, res) => {
     server.executeRequest(req, res);
 });
 
-// Ruta de salud para verificar que el servidor está funcionando
-app.get('/health', (req, res) => {
-    res.json({ status: 'OK', message: 'WebDAV Server is running' });
+// Ruta específica para calendarios
+app.use('/calendars', auth, (req, res) => {
+    server.executeRequest(req, res);
 });
 
-// Ruta raíz
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', message: 'WebDAV/CalDAV Server is running' });
+});
+
 app.get('/', (req, res) => {
-    res.send('WebDAV Server - Usa un cliente WebDAV para acceder');
+    res.send('WebDAV/CalDAV Server - Usa un cliente CalDAV para acceder');
 });
 
 const PORT = process.env.PORT || 3000;
 
 server.start(() => {
-    console.log(`WebDAV Server running on port ${server.options.port}`);
+    console.log(`WebDAV/CalDAV Server running on port ${server.options.port}`);
 });
 
 app.listen(PORT, () => {
     console.log(`Express server running on port ${PORT}`);
-});
-
-// Manejo de cierre graceful
-process.on('SIGINT', () => {
-    server.stop(() => {
-        console.log('WebDAV Server stopped');
-        process.exit(0);
-    });
 });
